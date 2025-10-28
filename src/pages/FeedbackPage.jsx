@@ -1,24 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { authAPI, tokenManager } from '../services/auth';
 import Sidebar from '../components/Sidebar';
-import Interview from '../components/Interview';
+import FeedbackList from '../components/FeedbackList';
 import './Home.css';
 
-const InterviewPage = () => {
+const FeedbackPage = () => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  
-  // Get course, agent, and student IDs from URL parameters
-  // If studentId is not in URL, it will be retrieved from localStorage in Interview component
-  const courseId = searchParams.get('courseId');
-  const agentId = searchParams.get('agentId');
-  const studentIdFromUrl = searchParams.get('studentId');
-  
-  // Get studentId from URL or localStorage
-  const studentId = studentIdFromUrl || tokenManager.getStudentId();
 
   useEffect(() => {
     // Check if user is authenticated
@@ -41,7 +31,6 @@ const InterviewPage = () => {
     navigate('/login');
   };
 
-
   if (isLoading) {
     return (
       <div className="home-container">
@@ -58,8 +47,8 @@ const InterviewPage = () => {
         <header className="home-header">
           <div className="header-content">
             <div className="header-info">
-              <h1>Interview</h1>
-              <p>Conduct AI-powered interviews</p>
+              <h1>Feedback</h1>
+              <p>View and manage interview feedback</p>
             </div>
             <div className="user-info">
               <span>Welcome, {user?.email}</span>
@@ -71,15 +60,12 @@ const InterviewPage = () => {
         </header>
         
         <main className="home-main">
-          <Interview 
-            courseId={courseId}
-            agentId={agentId}
-            studentId={studentId}
-          />
+          <FeedbackList />
         </main>
       </div>
     </div>
   );
 };
 
-export default InterviewPage;
+export default FeedbackPage;
+

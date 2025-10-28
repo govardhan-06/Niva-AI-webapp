@@ -1,10 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { tokenManager } from './services/auth';
+import { ToastProvider } from './components/ToastContainer';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Home from './pages/Home';
 import Course from './pages/Course';
 import InterviewPage from './pages/InterviewPage';
+import FeedbackPage from './pages/FeedbackPage';
+import StudentProfile from './pages/StudentProfile';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -13,8 +16,9 @@ function App() {
   const isAuthenticated = tokenManager.isAuthenticated();
 
   return (
-    <Router>
-      <div className="App">
+    <ToastProvider>
+      <Router>
+        <div className="App">
         <Routes>
           {/* Public routes */}
           <Route 
@@ -55,6 +59,22 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/feedback" 
+            element={
+              <ProtectedRoute>
+                <FeedbackPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/student-profile" 
+            element={
+              <ProtectedRoute>
+                <StudentProfile />
+              </ProtectedRoute>
+            } 
+          />
           
           {/* Default redirect */}
           <Route 
@@ -74,6 +94,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+    </ToastProvider>
   );
 }
 

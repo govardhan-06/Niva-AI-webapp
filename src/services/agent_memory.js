@@ -38,13 +38,17 @@ export const memoryAPI = {
     
     if (type === 'document' && file) {
       formData.append('file', file);
+      console.log('Uploading file:', file.name, 'Size:', file.size, 'Type:', file.type);
     }
+    
+    console.log('Calling agent memory API for course:', courseId);
     
     const response = await authenticatedApiCall(`/agent-memory/${courseId}/add-memory/`, {
       method: 'POST',
-      body: formData,
-      headers: {} // Remove Content-Type header to let browser set it with boundary for FormData
+      body: formData
     });
+    
+    console.log('Agent memory API response:', response);
     
     // Return the response directly as per API documentation
     return response;
@@ -75,14 +79,29 @@ export const memoryAPI = {
    * 
    * @param {string} courseId - The ID of the course
    * @param {string} memoryId - The ID of the memory
+   * @param {Object} options - Optional pagination parameters
+   * @param {number} options.limit - Number of results per page
+   * @param {number} options.offset - Offset for pagination (default: 0)
    * @returns {Promise<Object>} Response with memory content chunks
    */
-  getMemoryContent: async (courseId, memoryId) => {
+  getMemoryContent: async (courseId, memoryId, options = {}) => {
     if (!courseId || !memoryId) {
       throw new Error('courseId and memoryId are required');
     }
     
-    const response = await authenticatedApiCall(`/agent-memory/${courseId}/memory/${memoryId}/content/`, {
+    // Build query string with pagination parameters
+    const queryParams = new URLSearchParams();
+    if (options.limit !== undefined) {
+      queryParams.append('limit', options.limit.toString());
+    }
+    if (options.offset !== undefined) {
+      queryParams.append('offset', options.offset.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/agent-memory/${courseId}/memory/${memoryId}/content/${queryString ? '?' + queryString : ''}`;
+    
+    const response = await authenticatedApiCall(endpoint, {
       method: 'GET'
     });
     

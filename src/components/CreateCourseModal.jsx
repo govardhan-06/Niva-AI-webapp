@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { courseAPI } from '../services/course';
 import { memoryAPI } from '../services/agent_memory';
+import { useToast } from './ToastContainer';
 import './CreateCourseModal.css';
 
 const CreateCourseModal = ({ onClose, onCourseCreated }) => {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -22,11 +24,8 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
     url: ''
   });
   
-  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
-  const [createdCourseId, setCreatedCourseId] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -34,18 +33,6 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    
-    if (apiError) {
-      setApiError('');
-    }
   };
 
   const handleMemoryChange = (e) => {
@@ -62,66 +49,10 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
         [name]: value
       }));
     }
-    
-    // Clear error when user starts typing
-    if (errors[`memory_${name}`]) {
-      setErrors(prev => ({
-        ...prev,
-        [`memory_${name}`]: ''
-      }));
-    }
-  };
-
-  const validateStep1 = () => {
-    const newErrors = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Course name is required';
-    }
-    
-    if (!formData.description.trim()) {
-      newErrors.description = 'Course description is required';
-    }
-    
-    if (formData.passing_score < 0 || formData.passing_score > 100) {
-      newErrors.passing_score = 'Passing score must be between 0 and 100';
-    }
-    
-    if (formData.max_score < 0 || formData.max_score > 100) {
-      newErrors.max_score = 'Max score must be between 0 and 100';
-    }
-    
-    if (formData.passing_score >= formData.max_score) {
-      newErrors.passing_score = 'Passing score must be less than max score';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateStep2 = () => {
-    const newErrors = {};
-    
-    if (!agentMemory.name.trim()) {
-      newErrors.memory_name = 'Memory name is required';
-    }
-    
-    if (agentMemory.type === 'document' && !agentMemory.file) {
-      newErrors.memory_file = 'Please select a document file';
-    }
-    
-    if (agentMemory.type === 'website' && !agentMemory.url.trim()) {
-      newErrors.memory_url = 'Website URL is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
-    if (currentStep === 1 && validateStep1()) {
-      setCurrentStep(2);
-    }
+    setCurrentStep(2);
   };
 
   const handleBack = () => {
@@ -129,27 +60,22 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep2()) {
-      return;
-    }
-    
     setIsLoading(true);
-    setApiError('');
     
     try {
       // Step 1: Create the course
       const courseResponse = await courseAPI.createCourse(formData);
       const course = courseResponse.course;
-      setCreatedCourseId(course.id);
+      toast.showSuccess(courseResponse.message || 'Course created successfully');
       
       // Step 2: Add agent memory if provided
       if (agentMemory.name.trim()) {
         try {
           const memoryResponse = await memoryAPI.addMemory(course.id, agentMemory);
-          console.log('Agent memory added:', memoryResponse.message);
+          toast.showSuccess(memoryResponse.message || 'Agent memory added successfully');
         } catch (memoryError) {
           console.warn('Failed to add agent memory:', memoryError);
-          // Don't fail the entire operation if memory upload fails
+          toast.showWarning(memoryError.message || 'Course created but failed to add agent memory');
         }
       }
       
@@ -157,7 +83,7 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
       onClose();
     } catch (error) {
       console.error('Course creation failed:', error);
-      setApiError(error.message || 'Failed to create course. Please try again.');
+      toast.showError(error.message || 'Failed to create course. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -180,12 +106,6 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
         </div>
         
         <div className="modal-body">
-          {apiError && (
-            <div className="error-message">
-              {apiError}
-            </div>
-          )}
-          
           {/* Step Indicator */}
           <div className="step-indicator">
             <div className={`step ${currentStep >= 1 ? 'active' : ''}`}>
@@ -209,11 +129,9 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className={errors.name ? 'error' : ''}
                   placeholder="Enter course name"
                   disabled={isLoading}
                 />
-                {errors.name && <span className="field-error">{errors.name}</span>}
               </div>
               
               <div className="form-group">
@@ -223,12 +141,10 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
-                  className={errors.description ? 'error' : ''}
                   placeholder="Enter course description"
                   rows="3"
                   disabled={isLoading}
                 />
-                {errors.description && <span className="field-error">{errors.description}</span>}
               </div>
               
               <div className="form-row">
@@ -240,13 +156,11 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
                     name="passing_score"
                     value={formData.passing_score}
                     onChange={handleInputChange}
-                    className={errors.passing_score ? 'error' : ''}
                     min="0"
                     max="100"
                     step="0.1"
                     disabled={isLoading}
                   />
-                  {errors.passing_score && <span className="field-error">{errors.passing_score}</span>}
                 </div>
                 
                 <div className="form-group">
@@ -257,13 +171,11 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
                     name="max_score"
                     value={formData.max_score}
                     onChange={handleInputChange}
-                    className={errors.max_score ? 'error' : ''}
                     min="0"
                     max="100"
                     step="0.1"
                     disabled={isLoading}
                   />
-                  {errors.max_score && <span className="field-error">{errors.max_score}</span>}
                 </div>
               </div>
               
@@ -338,11 +250,9 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
                   name="name"
                   value={agentMemory.name}
                   onChange={handleMemoryChange}
-                  className={errors.memory_name ? 'error' : ''}
                   placeholder="Enter memory name"
                   disabled={isLoading}
                 />
-                {errors.memory_name && <span className="field-error">{errors.memory_name}</span>}
               </div>
               
               <div className="form-group">
@@ -362,27 +272,48 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
               {agentMemory.type === 'document' && (
                 <div className="form-group">
                   <label htmlFor="memory_file">Upload Document *</label>
-                  <div className="file-upload">
+                  <div className="file-upload-wrapper">
+                    <label htmlFor="memory_file" className="file-upload-label">
+                      <svg className="upload-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className="upload-text">
+                        {agentMemory.file ? 'Change file' : 'Click to choose file or drag and drop'}
+                      </span>
+                      <span className="upload-hint">PDF, DOC, DOCX, TXT (Max 10MB)</span>
+                    </label>
                     <input
                       type="file"
                       id="memory_file"
                       name="file"
                       onChange={handleMemoryChange}
-                      className={errors.memory_file ? 'error' : ''}
                       accept=".pdf,.doc,.docx,.txt"
                       disabled={isLoading}
+                      className="file-input-hidden"
                     />
-                    <div className="file-upload-info">
-                      <p>Supported formats: PDF, DOC, DOCX, TXT</p>
-                      <p>Max file size: 10MB</p>
-                    </div>
                   </div>
-                  {errors.memory_file && <span className="field-error">{errors.memory_file}</span>}
                   {agentMemory.file && (
                     <div className="file-selected">
-                      <span className="file-icon">📄</span>
-                      <span className="file-name">{agentMemory.file.name}</span>
-                      <span className="file-size">({(agentMemory.file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      <svg className="file-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <div className="file-info">
+                        <span className="file-name">{agentMemory.file.name}</span>
+                        <span className="file-size">{(agentMemory.file.size / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        className="file-remove"
+                        onClick={() => setAgentMemory(prev => ({ ...prev, file: null }))}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -397,11 +328,9 @@ const CreateCourseModal = ({ onClose, onCourseCreated }) => {
                     name="url"
                     value={agentMemory.url}
                     onChange={handleMemoryChange}
-                    className={errors.memory_url ? 'error' : ''}
                     placeholder="https://example.com"
                     disabled={isLoading}
                   />
-                  {errors.memory_url && <span className="field-error">{errors.memory_url}</span>}
                 </div>
               )}
             </div>

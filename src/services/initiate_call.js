@@ -9,17 +9,29 @@ export const entrypointAPI = {
    * 
    * @param {Object} callData - Call configuration
    * @param {string} callData.course_id - Required: The ID of the course associated with the call
+   * @param {string} callData.student_id - Required: The ID of the student for the call
    * @param {string} callData.agent_id - Optional: The ID of the agent to handle the call
    * @returns {Promise<Object>} Response with SIP endpoint, Daily room details, and agent info
    */
   initiateEntrypointCall: async (callData) => {
-    const { course_id, agent_id } = callData;
+    const { course_id, student_id, agent_id } = callData;
     
+    // Validate required parameters
     if (!course_id) {
       throw new Error('course_id is required');
     }
     
-    const requestBody = { course_id };
+    if (!student_id) {
+      throw new Error('student_id is required');
+    }
+    
+    // Build request body with required fields
+    const requestBody = {
+      course_id,
+      student_id
+    };
+    
+    // Add optional agent_id if provided
     if (agent_id) {
       requestBody.agent_id = agent_id;
     }
@@ -38,7 +50,8 @@ export const entrypointAPI = {
       room_url: response.data?.room_url || response.room_url,
       token: response.data?.token || response.token,
       course_name: response.data?.course_name || response.course_name,
-      agent_name: response.data?.agent_name || response.agent_name
+      agent_name: response.data?.agent_name || response.agent_name,
+      student_id: response.data?.student_id || response.student_id
     };
   }
 };

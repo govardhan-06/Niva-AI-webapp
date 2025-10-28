@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authAPI } from '../services/auth';
+import { authAPI, tokenManager } from '../services/auth';
+import { studentAPI } from '../services/student';
+import { useToast } from '../components/ToastContainer';
 import './Auth.css';
 
 const Login = () => {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
-  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
   
   const navigate = useNavigate();
 
@@ -20,70 +21,41 @@ const Login = () => {
       ...prev,
       [name]: value
     }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    
-    // Clear API error
-    if (apiError) {
-      setApiError('');
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      return;
-    }
-    
     setIsLoading(true);
-    setApiError('');
     
     try {
       const response = await authAPI.login(formData);
       
       if (response.success && response.data && response.data.token) {
-        // Redirect to course page after successful login
+        toast.showSuccess('Login successful!');
+        
+        // Check if user has a student profile
+        const userId = tokenManager.getUserId();
+        if (userId) {
+          try {
+            const studentResponse = await studentAPI.getStudentByUserId(userId);
+            if (studentResponse.student && studentResponse.student.id) {
+              // Store student ID if found
+              tokenManager.setStudentId(studentResponse.student.id);
+            }
+          } catch (error) {
+            // User doesn't have a student profile yet, that's okay
+            console.log('No student profile found for user');
+          }
+        }
+        
         navigate('/course');
       } else {
-        setApiError('Login failed. Please try again.');
+        toast.showError('Login failed. Please try again.');
       }
     } catch (error) {
       console.error('Login error:', error);
-      
-      // Handle different error types
-      if (error.message.includes('User is not registered')) {
-        setApiError('No account found with this email address');
-      } else if (error.message.includes('Invalid password')) {
-        setApiError('Invalid password');
-      } else {
-        setApiError(error.message || 'Login failed. Please try again.');
-      }
+      toast.showError(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -98,12 +70,6 @@ const Login = () => {
         </div>
         
         <form onSubmit={handleSubmit} className="auth-form">
-          {apiError && (
-            <div className="error-message">
-              {apiError}
-            </div>
-          )}
-          
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -112,11 +78,9 @@ const Login = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className={errors.email ? 'error' : ''}
               placeholder="Enter your email"
               disabled={isLoading}
             />
-            {errors.email && <span className="field-error">{errors.email}</span>}
           </div>
           
           <div className="form-group">
@@ -127,11 +91,9 @@ const Login = () => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className={errors.password ? 'error' : ''}
               placeholder="Enter your password"
               disabled={isLoading}
             />
-            {errors.password && <span className="field-error">{errors.password}</span>}
           </div>
           
           <button 
@@ -139,7 +101,7 @@ const Login = () => {
             className="auth-button"
             disabled={isLoading}
           >
-            {isLoading ? 'Signing in...' : 'Sign In'}
+            <span>{isLoading ? 'Signing in...' : 'Sign In'}</span>
           </button>
         </form>
         

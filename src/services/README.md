@@ -70,7 +70,7 @@ Handles agent memory operations including adding, retrieving, and deleting memor
 **Available Methods:**
 - `addMemory(courseId, memoryData)` - Add a new memory (document or website)
 - `deleteMemory(courseId, memoryId)` - Delete a memory
-- `getMemoryContent(courseId, memoryId)` - Get memory content
+- `getMemoryContent(courseId, memoryId, options)` - Get memory content with optional pagination
 - `getMemorySummary(courseId, memoryId)` - Get memory summary
 
 **Usage:**
@@ -91,15 +91,18 @@ const websiteMemory = await memoryAPI.addMemory(courseId, {
   url: 'https://example.com'
 });
 
-// Get memory content
-const content = await memoryAPI.getMemoryContent(courseId, memoryId);
+// Get memory content with pagination
+const content = await memoryAPI.getMemoryContent(courseId, memoryId, {
+  limit: 10,  // Number of results per page
+  offset: 0   // Offset for pagination (default: 0)
+});
 ```
 
 ### 📞 Entrypoint Call Service (`initiate_call.js`)
 Handles call initiation for the entrypoint voice API.
 
 **Available Methods:**
-- `initiateEntrypointCall(callData)` - Initiate a call with course and agent
+- `initiateEntrypointCall(callData)` - Initiate a call with course, agent, and student
 
 **Usage:**
 ```javascript
@@ -108,7 +111,8 @@ import { entrypointAPI } from './services/initiate_call';
 // Initiate a call
 const callResponse = await entrypointAPI.initiateEntrypointCall({
   course_id: 'course-uuid',
-  agent_id: 'agent-uuid' // Optional
+  agent_id: 'agent-uuid', // Optional
+  student_id: 'student-uuid' // Optional
 });
 
 // Response includes:
@@ -118,6 +122,37 @@ const callResponse = await entrypointAPI.initiateEntrypointCall({
 // - token: Daily room token
 // - course_name: Course name
 // - agent_name: Agent name
+// - student_id: Student ID
+```
+
+### 👥 Student Service (`student.js`)
+Handles student-related operations.
+
+**Available Methods:**
+- `listAllStudents()` - Get a list of all students
+
+**Usage:**
+```javascript
+import { studentAPI } from './services/student';
+
+// List all students
+const { students } = await studentAPI.listAllStudents();
+// Response includes array of students with id, first_name, last_name, full_name
+```
+
+### 📚 Course Service (Additional Methods)
+The course service now includes additional methods beyond the existing ones.
+
+**Additional Methods:**
+- `listAllCourses()` - Get a simple list of all courses with basic information
+
+**Usage:**
+```javascript
+import { courseAPI } from './services/course';
+
+// List all courses
+const { courses } = await courseAPI.listAllCourses();
+// Response includes array of courses with id, name, description, is_active, language
 ```
 
 ## API Configuration

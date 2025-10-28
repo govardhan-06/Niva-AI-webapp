@@ -1,6 +1,6 @@
 const API_BASE_URL = 'http://localhost:8000/api/v1'; // Update this with your backend URL
 
-// Token management
+// Token and user management
 export const tokenManager = {
   getToken: () => {
     return localStorage.getItem('niva_auth_token');
@@ -16,6 +16,43 @@ export const tokenManager = {
   
   isAuthenticated: () => {
     return !!localStorage.getItem('niva_auth_token');
+  },
+
+  // User ID management
+  getUserId: () => {
+    return localStorage.getItem('niva_user_id');
+  },
+
+  setUserId: (userId) => {
+    localStorage.setItem('niva_user_id', userId);
+  },
+
+  removeUserId: () => {
+    localStorage.removeItem('niva_user_id');
+  },
+
+  // Student ID management
+  getStudentId: () => {
+    return localStorage.getItem('niva_student_id');
+  },
+
+  setStudentId: (studentId) => {
+    localStorage.setItem('niva_student_id', studentId);
+  },
+
+  removeStudentId: () => {
+    localStorage.removeItem('niva_student_id');
+  },
+
+  hasStudentProfile: () => {
+    return !!localStorage.getItem('niva_student_id');
+  },
+
+  // Clear all stored data
+  clearAll: () => {
+    localStorage.removeItem('niva_auth_token');
+    localStorage.removeItem('niva_user_id');
+    localStorage.removeItem('niva_student_id');
   }
 };
 
@@ -31,7 +68,7 @@ const apiCall = async (endpoint, options = {}) => {
     headers: {
       // Only set Content-Type for non-FormData requests
       ...(!isFormData && { 'Content-Type': 'application/json' }),
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      ...(token && { 'Authorization': `Token ${token}` })
     }
   };
   
@@ -96,10 +133,16 @@ export const authAPI = {
       })
     });
     
+    // Store user ID if available in response
+    const user = response.data?.user || response.user;
+    if (user && user.id) {
+      tokenManager.setUserId(user.id);
+    }
+    
     // Return the response with proper structure
     return {
       message: response.message || 'User created successfully',
-      user: response.data?.user || response.user
+      user: user
     };
   },
   
@@ -119,9 +162,14 @@ export const authAPI = {
       })
     });
     
-    // Store token after successful login - token is nested in data object
+    // Store token and user ID after successful login
     if (response.success && response.data && response.data.token) {
       tokenManager.setToken(response.data.token);
+      
+      // Store user ID if available
+      if (response.data.user && response.data.user.id) {
+        tokenManager.setUserId(response.data.user.id);
+      }
     } else {
       throw new Error('Login failed: No token received');
     }
@@ -131,13 +179,13 @@ export const authAPI = {
   
   // Logout user
   logout: () => {
-    tokenManager.removeToken();
+    tokenManager.clearAll();
   },
   
   // Get authenticated API headers
   getAuthHeaders: () => {
     const token = tokenManager.getToken();
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    return token ? { 'Authorization': `Token ${token}` } : {};
   }
 };
 
@@ -153,7 +201,7 @@ export const authenticatedApiCall = async (endpoint, options = {}) => {
     ...options,
     headers: {
       ...options.headers,
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Token ${token}`
     }
   });
 };

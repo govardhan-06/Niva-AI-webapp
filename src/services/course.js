@@ -138,6 +138,22 @@ export const courseAPI = {
     return {
       message: response.message || 'Course deleted successfully'
     };
+  },
+  
+  /**
+   * List All Courses - Get a simple list of all courses with ID and basic information
+   * 
+   * @returns {Promise<Object>} Response with array of courses
+   */
+  listAllCourses: async () => {
+    const response = await authenticatedApiCall(`/course/list/`, {
+      method: 'GET'
+    });
+    
+    // Return the response directly as per API documentation
+    return {
+      courses: response.courses || []
+    };
   }
 };
 
