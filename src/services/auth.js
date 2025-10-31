@@ -48,11 +48,51 @@ export const tokenManager = {
     return !!localStorage.getItem('niva_student_id');
   },
 
+  // User role management
+  getUserRole: () => {
+    return localStorage.getItem('niva_user_role');
+  },
+
+  setUserRole: (role) => {
+    localStorage.setItem('niva_user_role', role);
+  },
+
+  removeUserRole: () => {
+    localStorage.removeItem('niva_user_role');
+  },
+
+  isAdmin: () => {
+    return localStorage.getItem('niva_user_role') === 'Admin' || 
+           localStorage.getItem('niva_user_role') === 'admin';
+  },
+
+  // User data management
+  getUserData: () => {
+    const data = localStorage.getItem('niva_user_data');
+    return data ? JSON.parse(data) : null;
+  },
+
+  setUserData: (userData) => {
+    localStorage.setItem('niva_user_data', JSON.stringify(userData));
+    if (userData.role) {
+      localStorage.setItem('niva_user_role', userData.role);
+    }
+    if (userData.id) {
+      localStorage.setItem('niva_user_id', userData.id);
+    }
+  },
+
+  removeUserData: () => {
+    localStorage.removeItem('niva_user_data');
+  },
+
   // Clear all stored data
   clearAll: () => {
     localStorage.removeItem('niva_auth_token');
     localStorage.removeItem('niva_user_id');
     localStorage.removeItem('niva_student_id');
+    localStorage.removeItem('niva_user_role');
+    localStorage.removeItem('niva_user_data');
   }
 };
 
@@ -180,6 +220,20 @@ export const authAPI = {
   // Logout user
   logout: () => {
     tokenManager.clearAll();
+  },
+
+  // Get current user data
+  getUserData: async () => {
+    const response = await authenticatedApiCall('/auth/user/data/', {
+      method: 'GET'
+    });
+    
+    // Store user data including role
+    if (response.user) {
+      tokenManager.setUserData(response.user);
+    }
+    
+    return response;
   },
   
   // Get authenticated API headers

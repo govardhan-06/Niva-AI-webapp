@@ -34,9 +34,21 @@ const Login = () => {
       if (response.success && response.data && response.data.token) {
         toast.showSuccess('Login successful!');
         
-        // Check if user has a student profile
+        // Fetch and store user data including role
+        try {
+          const userDataResponse = await authAPI.getUserData();
+          if (userDataResponse.user) {
+            // User data is already stored in tokenManager by getUserData
+          }
+        } catch (error) {
+          console.error('Failed to load user data:', error);
+          // Continue anyway - user data might be in response
+        }
+        
+        // Check if user has a student profile (only for non-admin users)
         const userId = tokenManager.getUserId();
-        if (userId) {
+        const userRole = tokenManager.getUserRole();
+        if (userId && userRole !== 'Admin' && userRole !== 'admin') {
           try {
             const studentResponse = await studentAPI.getStudentByUserId(userId);
             if (studentResponse.student && studentResponse.student.id) {

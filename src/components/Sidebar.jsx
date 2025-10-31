@@ -1,11 +1,14 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { tokenManager } from '../services/auth';
 import './Sidebar.css';
 
 const Sidebar = ({ activeTab, onTabChange }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdmin = tokenManager.isAdmin();
   
-  const tabs = [
+  // Base tabs for all users
+  const baseTabs = [
     { 
       id: 'course', 
       label: 'Courses', 
@@ -13,24 +16,25 @@ const Sidebar = ({ activeTab, onTabChange }) => {
       description: 'Manage your courses'
     },
     { 
-      id: 'interview', 
-      label: 'Interviews', 
-      path: '/interview',
-      description: 'AI-powered interviews'
-    },
-    { 
       id: 'feedback', 
       label: 'Feedback', 
       path: '/feedback',
       description: 'View feedback reports'
-    },
-    { 
-      id: 'student-profile', 
-      label: 'Student Profile', 
-      path: '/student-profile',
-      description: 'Manage your profile'
     }
   ];
+
+  // Student profile tab (only for non-admin users)
+  const studentProfileTab = { 
+    id: 'student-profile', 
+    label: 'Student Profile', 
+    path: '/student-profile',
+    description: 'Manage your profile'
+  };
+
+  // Combine tabs based on user role
+  const tabs = isAdmin 
+    ? baseTabs 
+    : [...baseTabs, studentProfileTab];
 
   const handleTabClick = (tab) => {
     navigate(tab.path);
@@ -41,7 +45,6 @@ const Sidebar = ({ activeTab, onTabChange }) => {
 
   // Determine active tab based on current location
   const currentTab = location.pathname === '/course' ? 'course' : 
-                    location.pathname === '/interview' ? 'interview' : 
                     location.pathname === '/feedback' ? 'feedback' : 
                     location.pathname === '/student-profile' ? 'student-profile' : 'course';
 
@@ -74,11 +77,6 @@ const Sidebar = ({ activeTab, onTabChange }) => {
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M4 19.5C4 18.837 4.26339 18.2011 4.73223 17.7322C5.20107 17.2634 5.83696 17 6.5 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M6.5 2H20V22H6.5C5.83696 22 5.20107 21.7366 4.73223 21.2678C4.26339 20.7989 4 20.163 4 19.5V4.5C4 3.83696 4.26339 3.20107 4.73223 2.73223C5.20107 2.26339 5.83696 2 6.5 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              ) : tab.id === 'interview' ? (
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 1C12 1 8 3.5 8 8V11C8 12.0609 7.57857 13.0783 6.82843 13.8284C6.07828 14.5786 5.06087 15 4 15H3C2.46957 15 1.96086 15.2107 1.58579 15.5858C1.21071 15.9609 1 16.4696 1 17V18C1 18.5304 1.21071 19.0391 1.58579 19.4142C1.96086 19.7893 2.46957 20 3 20H21C21.5304 20 22.0391 19.7893 22.4142 19.4142C22.7893 19.0391 23 18.5304 23 18V17C23 16.4696 22.7893 15.9609 22.4142 15.5858C22.0391 15.2107 21.5304 15 21 15H20C18.9391 15 17.9217 14.5786 17.1716 13.8284C16.4214 13.0783 16 12.0609 16 11V8C16 3.5 12 1 12 1Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M9 20V22C9 22.7956 9.31607 23.5587 9.87868 24.1213C10.4413 24.6839 11.2044 25 12 25C12.7956 25 13.5587 24.6839 14.1213 24.1213C14.6839 23.5587 15 22.7956 15 22V20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               ) : tab.id === 'feedback' ? (
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

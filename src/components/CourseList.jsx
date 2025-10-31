@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { courseAPI } from '../services/course';
+import { tokenManager } from '../services/auth';
 import CreateCourseModal from './CreateCourseModal';
 import EditCourseModal from './EditCourseModal';
 import ConfirmDialog from './ConfirmDialog';
@@ -15,6 +16,7 @@ const CourseList = () => {
   const [editingCourse, setEditingCourse] = useState(null);
   const [deletingCourse, setDeletingCourse] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isAdmin = tokenManager.isAdmin();
 
   useEffect(() => {
     loadCourses();
@@ -76,12 +78,14 @@ const CourseList = () => {
       <div className="course-list">
         <div className="course-list-header">
           <h1>My Courses</h1>
-          <button 
-            className="create-course-btn"
-            onClick={() => setShowCreateModal(true)}
-          >
-            + Create Course
-          </button>
+          {isAdmin && (
+            <button 
+              className="create-course-btn"
+              onClick={() => setShowCreateModal(true)}
+            >
+              + Create Course
+            </button>
+          )}
         </div>
         <div className="loading-state">
           <div className="loading-spinner"></div>
@@ -96,12 +100,14 @@ const CourseList = () => {
       <div className="course-list">
         <div className="course-list-header">
           <h1>My Courses</h1>
-          <button 
-            className="create-course-btn"
-            onClick={() => setShowCreateModal(true)}
-          >
-            + Create Course
-          </button>
+          {isAdmin && (
+            <button 
+              className="create-course-btn"
+              onClick={() => setShowCreateModal(true)}
+            >
+              + Create Course
+            </button>
+          )}
         </div>
         <div className="error-state">
           <p>{error}</p>
@@ -118,12 +124,14 @@ const CourseList = () => {
       <div className="course-list">
         <div className="course-list-header">
           <h1>My Courses</h1>
-          <button 
-            className="create-course-btn"
-            onClick={() => setShowCreateModal(true)}
-          >
-            + Create Course
-          </button>
+          {isAdmin && (
+            <button 
+              className="create-course-btn"
+              onClick={() => setShowCreateModal(true)}
+            >
+              + Create Course
+            </button>
+          )}
         </div>
         
         <div className="empty-state">
@@ -163,16 +171,18 @@ const CourseList = () => {
               <span>Progress tracking</span>
             </div>
           </div>
-          <button 
-            className="get-started-btn"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 5V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span>Create Your First Course</span>
-          </button>
+          {isAdmin && (
+            <button 
+              className="get-started-btn"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 5V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span>Create Your First Course</span>
+            </button>
+          )}
         </div>
 
         {showCreateModal && (
@@ -189,12 +199,14 @@ const CourseList = () => {
     <div className="course-list">
       <div className="course-list-header">
         <h1>My Courses ({courses.length})</h1>
-        <button 
-          className="create-course-btn"
-          onClick={() => setShowCreateModal(true)}
-        >
-          + Create Course
-        </button>
+        {isAdmin && (
+          <button 
+            className="create-course-btn"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + Create Course
+          </button>
+        )}
       </div>
       
       <div className="courses-grid">

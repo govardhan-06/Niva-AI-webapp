@@ -65,6 +65,50 @@ export const feedbackAPI = {
     );
     
     return response;
+  },
+
+  /**
+   * Get Feedbacks by User ID
+   * 
+   * Endpoint: GET /api/v1/feedback/user/
+   * 
+   * @param {Object} options - Optional parameters
+   * @param {string} options.user_id - User ID to get feedbacks for (defaults to current user)
+   * @param {string} options.course_id - Optional course ID to filter by
+   * @param {number} options.limit - Maximum number of feedbacks to return (default: 10, max: 100)
+   * @param {number} options.offset - Number of feedbacks to skip (default: 0)
+   * @returns {Promise<Object>} Response with array of feedback entries
+   * 
+   * Response includes:
+   * - feedbacks: Array of feedback objects
+   * - total_count: Total number of feedbacks
+   * - limit: Applied limit
+   * - offset: Applied offset
+   */
+  getFeedbacksByUserId: async (options = {}) => {
+    const { user_id, course_id, limit = 10, offset = 0 } = options;
+    
+    const queryParams = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString()
+    });
+    
+    if (user_id) {
+      queryParams.append('user_id', user_id);
+    }
+    
+    if (course_id) {
+      queryParams.append('course_id', course_id);
+    }
+    
+    const response = await authenticatedApiCall(
+      `/feedback/user/?${queryParams.toString()}`, 
+      {
+        method: 'GET'
+      }
+    );
+    
+    return response;
   }
 };
 
