@@ -27,7 +27,7 @@ const FeedbackList = () => {
 
   // Load options on mount and check user role
   useEffect(() => {
-    loadOptions();
+    // Check role first, then load options (which depends on role)
     checkUserRole();
   }, []);
 
@@ -35,23 +35,28 @@ const FeedbackList = () => {
     try {
       // Fetch fresh user data to ensure role is up to date
       const userDataResponse = await authAPI.getUserData();
-      if (userDataResponse.user) {
-        setIsAdmin(tokenManager.isAdmin());
-      } else {
-        setIsAdmin(tokenManager.isAdmin());
-      }
+      const adminStatus = tokenManager.isAdmin();
+      console.log('Setting admin status:', adminStatus);
+      setIsAdmin(adminStatus);
+      
+      // Load options after we know the role
+      await loadOptions(adminStatus);
     } catch (error) {
       console.error('Failed to check user role:', error);
-      setIsAdmin(tokenManager.isAdmin());
+      const adminStatus = tokenManager.isAdmin();
+      setIsAdmin(adminStatus);
+      await loadOptions(adminStatus);
     }
   };
   
   // Auto-load feedbacks for regular users on mount
   useEffect(() => {
-    if (!isAdmin && currentUserId) {
+    // Only load user feedbacks if NOT admin
+    if (!isAdmin && currentUserId && !isLoadingOptions) {
       loadUserFeedbacks();
     }
-  }, [isAdmin, currentUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, currentUserId, isLoadingOptions]);
 
   // Auto-load all feedbacks for admin on mount (when students are loaded)
   useEffect(() => {
@@ -65,21 +70,56 @@ const FeedbackList = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, students.length, isLoadingOptions]);
 
-  const loadOptions = async () => {
+  const loadOptions = async (adminStatus = null) => {
+    const isAdminUser = adminStatus !== null ? adminStatus : isAdmin;
     setIsLoadingOptions(true);
     try {
+      // Load courses first
+      console.log('Loading courses...');
       const coursesData = await courseAPI.listAllCourses();
-      setCourses(coursesData.courses || []);
+      console.log('Courses API response:', coursesData);
+      
+      // Handle different possible response structures
+      const coursesList = coursesData.data?.courses || 
+                          coursesData.courses || 
+                          [];
+      
+      console.log('Courses list extracted:', coursesList);
+      console.log('Number of courses:', coursesList.length);
+      
+      setCourses(coursesList);
       
       // Only load students if admin (needed for admin filters)
       // Use getAllStudents to get full student data including user_id
-      if (isAdmin) {
-        const studentsData = await studentAPI.getAllStudents();
-        setStudents(studentsData.students || []);
+      if (isAdminUser) {
+        console.log('Loading students for admin...');
+        try {
+          const studentsData = await studentAPI.getAllStudents();
+          console.log('getAllStudents response:', studentsData);
+          
+          // Handle different possible response structures
+          const studentsList = studentsData.data?.students || 
+                               studentsData.students || 
+                               [];
+          
+          console.log('Students list extracted:', studentsList);
+          console.log('Number of students:', studentsList.length);
+          
+          if (studentsList.length > 0) {
+            console.log('First student structure:', studentsList[0]);
+          }
+          
+          setStudents(studentsList);
+        } catch (studentErr) {
+          console.error('Failed to load students:', studentErr);
+          toast.showError('Failed to load students list');
+          setStudents([]);
+        }
       }
     } catch (err) {
       console.error('Failed to load options:', err);
       toast.showError('Failed to load course list');
+      setCourses([]);
     } finally {
       setIsLoadingOptions(false);
     }
@@ -131,40 +171,137 @@ const FeedbackList = () => {
         toast.showSuccess(response.message || `Loaded ${feedbacks.length} feedback(s)`);
       } else {
         // For admin view with no student filter, we need to get all students' feedbacks
-        // We'll iterate through all students and collect their feedbacks
+        // Since feedbacks are linked to user accounts (as seen when students log in),
+        // we need to find each student's user_id and use the /feedback/user/ endpoint
+        
+        // First, try to get all feedbacks without user_id filter - see if API returns all for admin
         let allFeedbacks = [];
         let processedCount = 0;
+        let studentsWithUsers = 0;
+        let studentsWithoutUsers = 0;
         
-        // Get all students with user_id (associated with user accounts)
-        const studentsWithUsers = students.filter(s => s.user_id);
-        
-        if (studentsWithUsers.length === 0) {
-          toast.showInfo('No students with user accounts found.');
-          setFeedbackList([]);
-          setTotalCount(0);
-          setIsLoading(false);
-          return;
+        console.log('Attempting to get all feedbacks for admin...');
+        try {
+          // Try calling /feedback/user/ without user_id to see if admin gets all feedbacks
+          const allFeedbacksResponse = await feedbackAPI.getFeedbacksByUserId({
+            course_id: selectedCourseId || undefined,
+            limit: 100,
+            offset: 0
+            // No user_id - see if API returns all feedbacks for admin
+          });
+          console.log('Response from getFeedbacksByUserId without user_id:', allFeedbacksResponse);
+          const feedbacksFromAllCall = allFeedbacksResponse.data?.feedbacks || 
+                                      allFeedbacksResponse.data?.data?.feedbacks || 
+                                      allFeedbacksResponse.feedbacks || 
+                                      [];
+          if (feedbacksFromAllCall.length > 0) {
+            console.log(`✓ Got ${feedbacksFromAllCall.length} feedbacks without user_id filter`);
+            allFeedbacks = feedbacksFromAllCall;
+            processedCount = 1; // Mark as processed
+          }
+        } catch (err) {
+          console.log('Cannot get all feedbacks without user_id, will try per-student:', err.message);
         }
         
-        // Fetch feedbacks for each student
-        for (const student of studentsWithUsers) {
-          try {
-            const requestOptions = {
-              user_id: student.user_id,
-              course_id: selectedCourseId || undefined,
-              limit: 100,
-              offset: 0
-            };
-            
-            const response = await feedbackAPI.getFeedbacksByUserId(requestOptions);
-            const feedbacks = response.data?.feedbacks || response.feedbacks || [];
-            allFeedbacks = [...allFeedbacks, ...feedbacks];
-            processedCount++;
-          } catch (err) {
-            console.error(`Failed to load feedback for student ${student.id}:`, err);
-            // Continue with next student
+        // If we didn't get feedbacks from the bulk call, try per-student using /feedback/student/ endpoint
+        if (allFeedbacks.length === 0) {
+          console.log('Bulk call failed, trying per-student approach using /feedback/student/ endpoint...');
+          console.log('Total students loaded:', students.length);
+          console.log('Students data:', students);
+          
+          if (students.length === 0) {
+            toast.showInfo('No students found. Please create students first.');
+            setFeedbackList([]);
+            setTotalCount(0);
+            setIsLoading(false);
+            return;
+          }
+        
+          // Process each student - use /feedback/student/ endpoint with their enrolled courses
+          // Each student record has a 'courses' array with their enrolled courses
+          for (const student of students) {
+            try {
+              let studentFeedbacks = [];
+              
+              // Get student's enrolled courses from their record
+              const studentCourses = student.courses || [];
+              console.log(`Processing student ${student.id} (${student.first_name} ${student.last_name})`);
+              console.log(`  Enrolled in ${studentCourses.length} course(s)`, studentCourses);
+              
+              // If a specific course is selected, only check that course
+              // Otherwise, check all courses the student is enrolled in
+              const coursesToCheck = selectedCourseId 
+                ? studentCourses.filter(c => c.id === selectedCourseId || c === selectedCourseId)
+                : studentCourses;
+              
+              console.log(`  Checking ${coursesToCheck.length} course(s) for feedbacks`);
+              
+              // Try to fetch feedbacks for each course
+              for (const course of coursesToCheck) {
+                try {
+                  // Handle both course object and course ID string
+                  const courseId = typeof course === 'object' ? course.id : course;
+                  
+                  if (!courseId) {
+                    console.log(`  ⚠ Skipping course - no ID found:`, course);
+                    continue;
+                  }
+                  
+                  console.log(`  Fetching feedback for student ${student.id} in course ${courseId}...`);
+                  
+                  const response = await feedbackAPI.getStudentFeedbacks(
+                    student.id, 
+                    courseId,
+                    { limit: 100, offset: 0 }
+                  );
+                  
+                  console.log(`  Response for course ${courseId}:`, response);
+                  
+                  // Handle different response structures
+                  const courseFeedbacks = response.data?.feedbacks || 
+                                        response.data?.data?.feedbacks || 
+                                        response.feedbacks || 
+                                        [];
+                  
+                  if (courseFeedbacks.length > 0) {
+                    console.log(`  ✓ Found ${courseFeedbacks.length} feedback(s) for course ${courseId}`);
+                    studentFeedbacks = [...studentFeedbacks, ...courseFeedbacks];
+                  } else {
+                    console.log(`  No feedbacks found for course ${courseId}`);
+                  }
+                } catch (courseErr) {
+                  // If error is "student not enrolled" or "no feedbacks", just skip this course
+                  const errorMsg = courseErr.message || '';
+                  if (errorMsg.includes('not enrolled') || 
+                      errorMsg.includes('not found') || 
+                      errorMsg.includes('no feedbacks')) {
+                    console.log(`  No feedbacks available for course ${typeof course === 'object' ? course.id : course} (student may not be enrolled or has no feedbacks)`);
+                  } else {
+                    console.error(`  Error fetching feedback for course ${typeof course === 'object' ? course.id : course}:`, courseErr);
+                  }
+                  // Continue with next course
+                }
+              }
+              
+              if (studentFeedbacks.length > 0) {
+                console.log(`✓ Collected ${studentFeedbacks.length} feedback(s) for student ${student.id}`);
+                allFeedbacks = [...allFeedbacks, ...studentFeedbacks];
+                processedCount++;
+                studentsWithUsers++;
+              } else {
+                console.log(`✗ No feedbacks found for student ${student.id}`);
+                studentsWithoutUsers++;
+              }
+            } catch (err) {
+              console.error(`Failed to process student ${student.id}:`, err);
+              studentsWithoutUsers++;
+            }
           }
         }
+        
+        console.log(`Processed ${processedCount} students with feedbacks (${studentsWithUsers} with feedbacks, ${studentsWithoutUsers} without)`);
+        console.log(`Total feedbacks collected: ${allFeedbacks.length}`);
+        console.log(`All feedbacks:`, allFeedbacks);
         
         // Sort by created_at descending (most recent first)
         allFeedbacks.sort((a, b) => {
@@ -175,7 +312,11 @@ const FeedbackList = () => {
         
         setFeedbackList(allFeedbacks);
         setTotalCount(allFeedbacks.length);
-        toast.showSuccess(`Loaded ${allFeedbacks.length} feedback(s) from ${processedCount} student(s)`);
+        if (allFeedbacks.length === 0) {
+          toast.showInfo(`No feedbacks found. Checked ${students.length} students (${studentsWithUsers} with user accounts, ${studentsWithoutUsers} without).`);
+        } else {
+          toast.showSuccess(`Loaded ${allFeedbacks.length} feedback(s) from ${processedCount} student(s)`);
+        }
       }
     } catch (err) {
       console.error('Failed to load feedback:', err);
@@ -211,9 +352,22 @@ const FeedbackList = () => {
       setTotalCount(totalCount);
     } catch (err) {
       console.error('Failed to load feedback:', err);
-      toast.showError(err.message || 'Failed to load feedback. Please try again.');
-      setFeedbackList([]);
-      setTotalCount(0);
+      
+      // Check if the error is just "no feedbacks available" - treat as empty result, not error
+      const errorMessage = err.message || '';
+      if (errorMessage.includes('No student profile found for this user') || 
+          errorMessage.includes('no feedbacks available') ||
+          errorMessage.includes('no feedbacks')) {
+        // This is expected - user doesn't have feedbacks yet, just show empty list
+        setFeedbackList([]);
+        setTotalCount(0);
+        // Don't show error toast for this case
+      } else {
+        // Real error - show error message
+        toast.showError(err.message || 'Failed to load feedback. Please try again.');
+        setFeedbackList([]);
+        setTotalCount(0);
+      }
     } finally {
       setIsLoading(false);
     }

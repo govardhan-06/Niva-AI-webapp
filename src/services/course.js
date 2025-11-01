@@ -150,9 +150,19 @@ export const courseAPI = {
       method: 'GET'
     });
     
-    // Return the response directly as per API documentation
+    console.log('listAllCourses API response:', response);
+    
+    // Handle different possible response structures (similar to getUserData)
+    // API might return: { data: { courses: [...] } } or { courses: [...] }
+    const coursesList = response.data?.courses || 
+                       response.courses || 
+                       [];
+    
+    console.log('listAllCourses extracted courses:', coursesList);
+    
+    // Return the response with proper structure
     return {
-      courses: response.courses || []
+      courses: coursesList
     };
   }
 };
