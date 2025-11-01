@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/auth';
 import { useToast } from '../components/ToastContainer';
-import StudentProfileModal from '../components/StudentProfileModal';
 import './Auth.css';
 
 const Signup = () => {
@@ -14,7 +13,6 @@ const Signup = () => {
     role_type: 'user'
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [showStudentModal, setShowStudentModal] = useState(false);
   
   const navigate = useNavigate();
 
@@ -60,8 +58,31 @@ const Signup = () => {
         
         if (loginResponse.success && loginResponse.data && loginResponse.data.token) {
           toast.showSuccess('Registration successful!');
-          // Show student profile modal now that we have a token
-          setShowStudentModal(true);
+          
+          // Fetch and store user data including role
+          try {
+            const userDataResponse = await authAPI.getUserData();
+            console.log('Signup - getUserData response:', userDataResponse);
+            
+            // Handle nested response structure
+            const user = userDataResponse.data?.user || userDataResponse.user;
+            
+            if (user) {
+              console.log('Signup - User role:', user.role);
+              // User data is already stored in tokenManager by getUserData
+              // Verify it was stored
+              const storedRole = tokenManager.getUserRole();
+              console.log('Signup - Stored role after getUserData:', storedRole);
+            } else {
+              console.error('Signup - No user in getUserData response');
+            }
+          } catch (error) {
+            console.error('Failed to load user data:', error);
+            // Continue anyway
+          }
+          
+          // Redirect to course page
+          navigate('/course');
         } else {
           // Registration succeeded but auto-login failed
           toast.showWarning('Registration successful! Please log in.');
@@ -76,18 +97,6 @@ const Signup = () => {
     }
   };
 
-  const handleStudentProfileSuccess = () => {
-    // Student profile created successfully, redirect to course page
-    toast.showSuccess('Welcome! Your profile has been created.');
-    navigate('/course');
-  };
-
-  const handleStudentModalClose = () => {
-    // User skipped student profile creation, redirect to course page
-    setShowStudentModal(false);
-    toast.showInfo('You can create your student profile later from the Student Profile page.');
-    navigate('/course');
-  };
 
   return (
     <>
@@ -175,13 +184,6 @@ const Signup = () => {
           </div>
         </div>
       </div>
-
-      {/* Student Profile Modal */}
-      <StudentProfileModal
-        isOpen={showStudentModal}
-        onClose={handleStudentModalClose}
-        onSuccess={handleStudentProfileSuccess}
-      />
     </>
   );
 };

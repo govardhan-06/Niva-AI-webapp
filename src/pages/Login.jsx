@@ -34,31 +34,44 @@ const Login = () => {
       if (response.success && response.data && response.data.token) {
         toast.showSuccess('Login successful!');
         
-        // Fetch and store user data including role
+        // Fetch and store user data including role from API
         try {
           const userDataResponse = await authAPI.getUserData();
-          if (userDataResponse.user) {
+          console.log('Login - getUserData response:', userDataResponse);
+          
+          // Handle nested response structure
+          const user = userDataResponse.data?.user || userDataResponse.user;
+          
+          if (user) {
             // User data is already stored in tokenManager by getUserData
+            // This includes the role field which will be used to determine admin vs student view
+            const userRole = user.role;
+            console.log('Login - User role from API:', userRole);
+            
+            // Verify it was stored
+            const storedRole = tokenManager.getUserRole();
+            console.log('Login - Stored role after getUserData:', storedRole);
+            
+            // Check if user has a student profile (only for non-admin users)
+            const userId = tokenManager.getUserId();
+            if (userId && userRole !== 'Admin' && userRole !== 'admin') {
+              try {
+                const studentResponse = await studentAPI.getStudentByUserId(userId);
+                if (studentResponse.student && studentResponse.student.id) {
+                  // Store student ID if found
+                  tokenManager.setStudentId(studentResponse.student.id);
+                }
+              } catch (error) {
+                // User doesn't have a student profile yet, that's okay
+                console.log('No student profile found for user');
+              }
+            }
+          } else {
+            console.error('Login - No user in getUserData response');
           }
         } catch (error) {
           console.error('Failed to load user data:', error);
           // Continue anyway - user data might be in response
-        }
-        
-        // Check if user has a student profile (only for non-admin users)
-        const userId = tokenManager.getUserId();
-        const userRole = tokenManager.getUserRole();
-        if (userId && userRole !== 'Admin' && userRole !== 'admin') {
-          try {
-            const studentResponse = await studentAPI.getStudentByUserId(userId);
-            if (studentResponse.student && studentResponse.student.id) {
-              // Store student ID if found
-              tokenManager.setStudentId(studentResponse.student.id);
-            }
-          } catch (error) {
-            // User doesn't have a student profile yet, that's okay
-            console.log('No student profile found for user');
-          }
         }
         
         navigate('/course');

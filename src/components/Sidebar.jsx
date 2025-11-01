@@ -1,11 +1,31 @@
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { tokenManager } from '../services/auth';
+import { tokenManager, authAPI } from '../services/auth';
 import './Sidebar.css';
 
 const Sidebar = ({ activeTab, onTabChange }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isAdmin = tokenManager.isAdmin();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkUserRole();
+  }, []);
+
+  const checkUserRole = async () => {
+    try {
+      // Fetch fresh user data to ensure role is up to date
+      const userDataResponse = await authAPI.getUserData();
+      if (userDataResponse.user) {
+        setIsAdmin(tokenManager.isAdmin());
+      } else {
+        setIsAdmin(tokenManager.isAdmin());
+      }
+    } catch (error) {
+      console.error('Failed to check user role:', error);
+      setIsAdmin(tokenManager.isAdmin());
+    }
+  };
   
   // Base tabs for all users
   const baseTabs = [

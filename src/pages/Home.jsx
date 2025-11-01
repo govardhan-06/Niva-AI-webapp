@@ -11,19 +11,40 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is authenticated
-    if (!tokenManager.isAuthenticated()) {
-      navigate('/login');
-      return;
-    }
+    const loadUserData = async () => {
+      // Check if user is authenticated
+      if (!tokenManager.isAuthenticated()) {
+        navigate('/login');
+        return;
+      }
+      
+      try {
+        // Fetch user data from API to get current role
+        const response = await authAPI.getUserData();
+        if (response.user) {
+          setUser(response.user);
+        } else {
+          // Fallback to stored user data if API fails
+          const storedUser = tokenManager.getUserData();
+          if (storedUser) {
+            setUser(storedUser);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user data:', error);
+        // Fallback to stored user data
+        const storedUser = tokenManager.getUserData();
+        if (storedUser) {
+          setUser(storedUser);
+        } else {
+          navigate('/login');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    // You can add an API call here to get user details if needed
-    // For now, we'll just set a mock user
-    setUser({
-      email: 'user@example.com', // This should come from an API call
-      role: 'User'
-    });
-    setIsLoading(false);
+    loadUserData();
   }, [navigate]);
 
   const handleLogout = () => {

@@ -62,8 +62,15 @@ export const tokenManager = {
   },
 
   isAdmin: () => {
-    return localStorage.getItem('niva_user_role') === 'Admin' || 
-           localStorage.getItem('niva_user_role') === 'admin';
+    const role = localStorage.getItem('niva_user_role');
+    console.log('Checking admin role. Stored role:', role);
+    // Check for various possible role values - according to API docs, it should be "Admin" or "User"
+    const isAdminResult = role === 'Admin' || 
+           role === 'admin' ||
+           role === 'AdminUser' ||
+           role === 'ADMIN';
+    console.log('isAdmin result:', isAdminResult);
+    return isAdminResult;
   },
 
   // User data management
@@ -76,6 +83,7 @@ export const tokenManager = {
     localStorage.setItem('niva_user_data', JSON.stringify(userData));
     if (userData.role) {
       localStorage.setItem('niva_user_role', userData.role);
+      console.log('Stored user role:', userData.role);
     }
     if (userData.id) {
       localStorage.setItem('niva_user_id', userData.id);
@@ -173,10 +181,18 @@ export const authAPI = {
       })
     });
     
+    console.log('Register API response:', response);
+    
     // Store user ID if available in response
     const user = response.data?.user || response.user;
+    console.log('Register - Extracted user:', user);
     if (user && user.id) {
       tokenManager.setUserId(user.id);
+      // Also try to store role if available in registration response
+      if (user.role) {
+        console.log('Register - Role from response:', user.role);
+        tokenManager.setUserRole(user.role);
+      }
     }
     
     // Return the response with proper structure
@@ -202,13 +218,22 @@ export const authAPI = {
       })
     });
     
+    console.log('Login API response:', response);
+    
     // Store token and user ID after successful login
     if (response.success && response.data && response.data.token) {
       tokenManager.setToken(response.data.token);
       
+      console.log('Login - response.data:', response.data);
+      
       // Store user ID if available
       if (response.data.user && response.data.user.id) {
         tokenManager.setUserId(response.data.user.id);
+        // Also try to store role if available in login response
+        if (response.data.user.role) {
+          console.log('Login - Role from response:', response.data.user.role);
+          tokenManager.setUserRole(response.data.user.role);
+        }
       }
     } else {
       throw new Error('Login failed: No token received');
@@ -228,9 +253,27 @@ export const authAPI = {
       method: 'GET'
     });
     
-    // Store user data including role
-    if (response.user) {
-      tokenManager.setUserData(response.user);
+    console.log('getUserData API response:', response);
+    
+    // Handle different response structures
+    // API returns: { data: { user: {...} } } or { user: {...} }
+    const user = response.data?.user || response.user;
+    
+    if (user) {
+      console.log('User data from API:', user);
+      console.log('User role from API:', user.role);
+      
+      // Store the user data and role
+      tokenManager.setUserData(user);
+      
+      // Ensure role is explicitly stored
+      if (user.role) {
+        console.log('Storing role:', user.role);
+        tokenManager.setUserRole(user.role);
+      }
+    } else {
+      console.warn('No user data in API response:', response);
+      console.warn('Full response structure:', JSON.stringify(response, null, 2));
     }
     
     return response;

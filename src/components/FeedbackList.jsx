@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { feedbackAPI } from '../services/feedback';
 import { studentAPI } from '../services/student';
 import { courseAPI } from '../services/course';
-import { tokenManager } from '../services/auth';
+import { tokenManager, authAPI } from '../services/auth';
 import { useToast } from './ToastContainer';
 import './FeedbackList.css';
 
@@ -12,8 +12,7 @@ const FeedbackList = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
-  
-  const isAdmin = tokenManager.isAdmin();
+  const [isAdmin, setIsAdmin] = useState(false);
   const currentUserId = tokenManager.getUserId();
   
   // Admin-specific filters
@@ -26,10 +25,26 @@ const FeedbackList = () => {
   const [courses, setCourses] = useState([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
 
-  // Load options on mount
+  // Load options on mount and check user role
   useEffect(() => {
     loadOptions();
+    checkUserRole();
   }, []);
+
+  const checkUserRole = async () => {
+    try {
+      // Fetch fresh user data to ensure role is up to date
+      const userDataResponse = await authAPI.getUserData();
+      if (userDataResponse.user) {
+        setIsAdmin(tokenManager.isAdmin());
+      } else {
+        setIsAdmin(tokenManager.isAdmin());
+      }
+    } catch (error) {
+      console.error('Failed to check user role:', error);
+      setIsAdmin(tokenManager.isAdmin());
+    }
+  };
   
   // Auto-load feedbacks for regular users on mount
   useEffect(() => {
@@ -37,6 +52,18 @@ const FeedbackList = () => {
       loadUserFeedbacks();
     }
   }, [isAdmin, currentUserId]);
+
+  // Auto-load all feedbacks for admin on mount (when students are loaded)
+  useEffect(() => {
+    if (isAdmin && students.length > 0 && !isLoadingOptions) {
+      // Load all feedbacks when admin view loads (first time)
+      // Subsequent loads are handled by the filter change effect
+      if (feedbackList.length === 0) {
+        loadAdminFeedbacks();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, students.length, isLoadingOptions]);
 
   const loadOptions = async () => {
     setIsLoadingOptions(true);
@@ -72,31 +99,84 @@ const FeedbackList = () => {
     }
   }, [selectedStudentId, students, isAdmin]);
 
+  // Reload feedbacks when admin filters change
+  useEffect(() => {
+    if (isAdmin && students.length > 0 && !isLoadingOptions) {
+      loadAdminFeedbacks();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUserId, selectedCourseId]);
+
   // Load feedbacks for admin (can filter by user_id and course_id)
+  // When no filters are selected, we need to get all students' feedbacks
   const loadAdminFeedbacks = async () => {
     try {
       setIsLoading(true);
-      const requestOptions = {
-        course_id: selectedCourseId || undefined,
-        limit: 100,
-        offset: 0
-      };
       
-      // Only include user_id if a student is selected
-      // If no student selected, don't include user_id - API may return all or handle differently
+      // If a specific student is selected, get their feedbacks
       if (selectedUserId) {
-        requestOptions.user_id = selectedUserId;
+        const requestOptions = {
+          user_id: selectedUserId,
+          course_id: selectedCourseId || undefined,
+          limit: 100,
+          offset: 0
+        };
+        
+        const response = await feedbackAPI.getFeedbacksByUserId(requestOptions);
+        const feedbacks = response.data?.feedbacks || response.feedbacks || [];
+        const totalCount = response.data?.total_count || response.total_count || 0;
+        
+        setFeedbackList(feedbacks);
+        setTotalCount(totalCount);
+        toast.showSuccess(response.message || `Loaded ${feedbacks.length} feedback(s)`);
+      } else {
+        // For admin view with no student filter, we need to get all students' feedbacks
+        // We'll iterate through all students and collect their feedbacks
+        let allFeedbacks = [];
+        let processedCount = 0;
+        
+        // Get all students with user_id (associated with user accounts)
+        const studentsWithUsers = students.filter(s => s.user_id);
+        
+        if (studentsWithUsers.length === 0) {
+          toast.showInfo('No students with user accounts found.');
+          setFeedbackList([]);
+          setTotalCount(0);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Fetch feedbacks for each student
+        for (const student of studentsWithUsers) {
+          try {
+            const requestOptions = {
+              user_id: student.user_id,
+              course_id: selectedCourseId || undefined,
+              limit: 100,
+              offset: 0
+            };
+            
+            const response = await feedbackAPI.getFeedbacksByUserId(requestOptions);
+            const feedbacks = response.data?.feedbacks || response.feedbacks || [];
+            allFeedbacks = [...allFeedbacks, ...feedbacks];
+            processedCount++;
+          } catch (err) {
+            console.error(`Failed to load feedback for student ${student.id}:`, err);
+            // Continue with next student
+          }
+        }
+        
+        // Sort by created_at descending (most recent first)
+        allFeedbacks.sort((a, b) => {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return dateB - dateA;
+        });
+        
+        setFeedbackList(allFeedbacks);
+        setTotalCount(allFeedbacks.length);
+        toast.showSuccess(`Loaded ${allFeedbacks.length} feedback(s) from ${processedCount} student(s)`);
       }
-      
-      const response = await feedbackAPI.getFeedbacksByUserId(requestOptions);
-      
-      // Handle response structure: response.data.feedbacks or response.feedbacks
-      const feedbacks = response.data?.feedbacks || response.feedbacks || [];
-      const totalCount = response.data?.total_count || response.total_count || 0;
-      
-      setFeedbackList(feedbacks);
-      setTotalCount(totalCount);
-      toast.showSuccess(response.message || `Loaded ${feedbacks.length} feedback(s)`);
     } catch (err) {
       console.error('Failed to load feedback:', err);
       toast.showError(err.message || 'Failed to load feedback. Please try again.');
