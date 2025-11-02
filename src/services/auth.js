@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://52.28.190.158/api/v1'; // Update this with your backend URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
+console.log('API_BASE_URL:', API_BASE_URL);
 
 // Token and user management
 export const tokenManager = {
