@@ -161,7 +161,7 @@ const { courses } = await courseAPI.listAllCourses();
 Update the `API_BASE_URL` in `auth.js` to match your backend server:
 
 ```javascript
-const API_BASE_URL = 'http://localhost:8000/api/v1'; // Update this
+const API_BASE_URL = 'http://52.28.190.158/api/v1'; // Update this
 ```
 
 ### Authentication Flow
