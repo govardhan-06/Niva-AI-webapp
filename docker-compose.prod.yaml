@@ -10,6 +10,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/letsencrypt/live/nivaai.qulander.com/:/etc/letsencrypt/live/nivaai.qulander.com/:ro
     restart: unless-stopped
 

@@ -28,17 +28,15 @@ FROM nginx:alpine
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration (optional, for SPA routing)
-RUN echo 'server { \
-    listen 80; \
-    server_name _; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Copy your custom nginx.conf (we'll create this next)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy SSL certificates (optional: if they exist locally in certs/ folder)
+# If certs are on EC2 (via certbot), mount them in docker-compose instead of copying
+# COPY certs /etc/letsencrypt/live/nivaai.qulander.com/
 
 EXPOSE 80
+EXPOSE 443
 
 CMD ["nginx", "-g", "daemon off;"]
+
